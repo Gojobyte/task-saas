@@ -1,0 +1,300 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ AUTH MODELS ============
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============ USER & WORKSPACE ============
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  ownedWorkspaces Workspace[] @relation("WorkspaceOwner")
+  memberships   WorkspaceMember[]
+  assignedTasks Task[]        @relation("TaskAssignee")
+  createdTasks  Task[]        @relation("TaskCreator")
+  comments      Comment[]
+  attachments   Attachment[]
+  activityLogs  ActivityLog[]
+  notifications Notification[]
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      Plan     @default(FREE)
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner     User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members   WorkspaceMember[]
+  projects  Project[]
+  subscription Subscription?
+
+  @@index([slug])
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  id          String       @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        MemberRole   @default(MEMBER)
+  joinedAt    DateTime     @default(now())
+
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+model Subscription {
+  id               String            @id @default(cuid())
+  workspaceId      String            @unique
+  plan             Plan              @default(FREE)
+  status           SubscriptionStatus @default(ACTIVE)
+  currentPeriodEnd DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ============ PROJECT & TASK ============
+
+model Project {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?  @db.Text
+  color       String   @default("#3B82F6")
+  icon        String   @default("folder")
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+
+  @@index([workspaceId])
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  projectId   String
+  title       String
+  description String?      @db.Text
+  status      TaskStatus   @default(BACKLOG)
+  priority    TaskPriority @default(MEDIUM)
+  position    Int          @default(0)
+  assigneeId  String?
+  dueDate     DateTime?
+  createdBy   String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee    User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creator     User         @relation("TaskCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  comments    Comment[]
+  attachments Attachment[]
+  activityLogs ActivityLog[]
+  subtasks    Subtask[]
+
+  @@index([projectId])
+  @@index([assigneeId])
+  @@index([createdBy])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model Subtask {
+  id        String   @id @default(cuid())
+  taskId    String
+  title     String
+  completed Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  name      String
+  url       String
+  size      Int
+  mimeType  String?
+  createdAt DateTime @default(now())
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  taskId   String
+  userId   String
+  action   String
+  details  Json?
+  createdAt DateTime @default(now())
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId   String
+  title     String
+  message   String           @db.Text
+  type      NotificationType @default(TASK_UPDATE)
+  read      Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+}
+
+model InviteToken {
+  id          String       @id @default(cuid())
+  workspaceId String
+  email       String
+  role        MemberRole   @default(MEMBER)
+  token       String       @unique
+  expires     DateTime
+  createdAt   DateTime     @default(now())
+
+  @@unique([workspaceId, email])
+  @@index([token])
+}
+
+// ============ ENUMS ============
+
+enum Plan {
+  FREE
+  PRO
+  TEAM
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum TaskStatus {
+  BACKLOG
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  TRIALING
+}
+
+enum NotificationType {
+  TASK_UPDATE
+  TASK_ASSIGNED
+  TASK_COMMENT
+  TASK_DUE
+  MENTION
+  INVITE
+}
