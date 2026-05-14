@@ -172,9 +172,9 @@ export default function TaskSaasPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0f172a]">
+    <div className="min-h-screen bg-[#0f172a] lg:flex">
       {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 z-50 h-full w-[240px] bg-[#1e293b] border-r border-[#334155] flex flex-col transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:relative`}>
+      <aside className={`fixed top-0 left-0 z-50 h-full w-[240px] shrink-0 bg-[#1e293b] border-r border-[#334155] flex flex-col transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:sticky lg:top-0 lg:h-screen`}>
         <div className="flex items-center gap-3 px-5 py-5 border-b border-[#334155]">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center">
             <CheckCircle2 size={18} className="text-white" />
@@ -217,7 +217,7 @@ export default function TaskSaasPage() {
       {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
       {/* Main */}
-      <main className="lg:ml-[240px] min-h-screen">
+      <main className="flex-1 min-h-screen">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-[#0f172a]/80 backdrop-blur-xl border-b border-[#1e293b]">
           <div className="flex items-center justify-between px-4 lg:px-8 py-4">
